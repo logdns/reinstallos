@@ -1012,17 +1012,35 @@ setos() {
         is_virt && flavour=virt || flavour=lts
 
         # alpine aarch64 3.16/3.17 virt 没有直连链接
-        if [ "$basearch" = aarch64 ] &&
-            { [ "$releasever" = 3.16 ] || [ "$releasever" = 3.17 ]; }; then
-            flavour=lts
+if is_in_china; then
+    # 使用多个中国镜像源备选
+    for m in \
+        http://mirrors.tuna.tsinghua.edu.cn/alpine \
+        http://mirrors.ustc.edu.cn/alpine \
+        http://mirrors.aliyun.com/alpine \
+        http://mirror.nju.edu.cn/alpine; do
+        if curl -m 5 -sf "$m/v$releasever/releases/$basearch/netboot/vmlinuz-$flavour" >/dev/null; then
+            mirror=$m/v$releasever
+            break
         fi
+    done
+else
+    # 使用多个国际镜像源备选
+    for m in \
+        http://dl-cdn.alpinelinux.org/alpine \
+        http://uk.alpinelinux.org/alpine \
+        http://alpine.mirror.far.fi \
+        http://mirror.clarkson.edu/alpine; do
+        if curl -m 5 -sf "$m/v$releasever/releases/$basearch/netboot/vmlinuz-$flavour" >/dev/null; then
+            mirror=$m/v$releasever
+            break
+        fi
+    done
+fi
 
-        # 不要用https 因为甲骨文云arm initramfs阶段不会从硬件同步时钟，导致访问https出错
-        if is_in_china; then
-            mirror=http://mirror.nju.edu.cn/alpine/v$releasever
-        else
-            mirror=http://dl-cdn.alpinelinux.org/alpine/v$releasever
-        fi
+if [ -z "$mirror" ]; then
+    error_and_exit "Could not find a working Alpine mirror"
+fi
         eval ${step}_vmlinuz=$mirror/releases/$basearch/netboot/vmlinuz-$flavour
         eval ${step}_initrd=$mirror/releases/$basearch/netboot/initramfs-$flavour
         eval ${step}_modloop=$mirror/releases/$basearch/netboot/modloop-$flavour
